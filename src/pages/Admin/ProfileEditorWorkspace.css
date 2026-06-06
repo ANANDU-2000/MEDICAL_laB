@@ -461,10 +461,52 @@
   background: #fff;
 }
 
+.pew-tests-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 16px;
+  align-items: start;
+}
+
+.pew-tests-main {
+  min-width: 0;
+}
+
+.pew-tests-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 12px;
+}
+
+.pew-test-table-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.pew-test-check-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pew-test-check-col input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.pew-test-card--focused {
+  box-shadow: inset 3px 0 0 #0d9488;
+}
+
 .pew-test-table-head,
 .pew-test-row {
   display: grid;
-  grid-template-columns: 44px minmax(210px, 1.2fr) 70px 86px 84px 78px minmax(120px, 0.85fr) 74px 104px;
+  grid-template-columns: 32px 44px minmax(190px, 1.1fr) 70px 86px 84px 78px minmax(110px, 0.8fr) 74px 148px;
   gap: 6px;
   align-items: center;
 }
@@ -1043,17 +1085,14 @@
 }
 
 .pew-test-remove {
-  padding: 8px;
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  border-radius: 8px;
-  cursor: pointer;
+  border: 1px solid #fecaca !important;
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
 }
 
 .pew-test-remove:hover {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
 }
 
 .pew-test-card-body {
@@ -1476,12 +1515,27 @@
 }
 
 @media (max-width: 1180px) {
+  .pew-tests-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pew-tests-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .pew-tests-sidebar .catalog-sidebar,
+  .pew-tests-sidebar .urine-template-picker {
+    flex: 1 1 280px;
+  }
+
   .pew-test-table-head {
     display: none;
   }
 
   .pew-test-row {
-    grid-template-columns: 36px minmax(180px, 1fr) 90px 98px;
+    grid-template-columns: 28px 36px minmax(160px, 1fr) auto;
     gap: 4px;
     padding: 8px;
   }
@@ -1509,7 +1563,7 @@
   }
 
   .pew-test-row {
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-columns: 28px 32px minmax(0, 1fr) auto;
   }
 
   .pew-test-row .pew-test-cell,

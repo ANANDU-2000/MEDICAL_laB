@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
-import { getProfiles } from '../../features/shared/dataService';
+import { Plus, Search, Edit2, Trash2, Package, Copy } from 'lucide-react';
+import { getProfiles, deleteProfile, deleteProfiles, duplicateProfile } from '../../features/shared/dataService';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import toast from 'react-hot-toast';
@@ -27,14 +27,16 @@ const ProfileManager = () => {
     p.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDeleteProfile = (profileId) => {
+  const handleDeleteProfile = async (profileId) => {
     if (!confirm('Are you sure you want to DELETE this profile permanently? This cannot be undone.')) return;
 
     try {
-      const allProfiles = JSON.parse(localStorage.getItem('healit_profiles') || '[]');
-      const updatedProfiles = allProfiles.filter(p => p.profileId !== profileId);
-      localStorage.setItem('healit_profiles', JSON.stringify(updatedProfiles));
-      toast.success('Profile deleted successfully');
+      const { deleted, synced } = await deleteProfile(profileId);
+      if (!deleted) {
+        toast.error('Profile not found');
+        return;
+      }
+      toast.success(synced ? 'Profile deleted successfully' : 'Profile deleted locally (server sync failed)');
       loadData();
       setSelectedProfiles([]);
     } catch {
@@ -42,7 +44,7 @@ const ProfileManager = () => {
     }
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (selectedProfiles.length === 0) {
       toast.error('No profiles selected');
       return;
@@ -51,14 +53,34 @@ const ProfileManager = () => {
     if (!confirm(`Delete ${selectedProfiles.length} selected profile(s)? This cannot be undone.`)) return;
 
     try {
-      const allProfiles = JSON.parse(localStorage.getItem('healit_profiles') || '[]');
-      const updatedProfiles = allProfiles.filter(p => !selectedProfiles.includes(p.profileId));
-      localStorage.setItem('healit_profiles', JSON.stringify(updatedProfiles));
-      toast.success(`${selectedProfiles.length} profile(s) deleted successfully`);
+      const { deletedCount, synced } = await deleteProfiles(selectedProfiles);
+      if (deletedCount === 0) {
+        toast.error('No profiles were deleted');
+        return;
+      }
+      toast.success(
+        synced
+          ? `${deletedCount} profile(s) deleted successfully`
+          : `${deletedCount} profile(s) deleted locally (server sync failed)`
+      );
       setSelectedProfiles([]);
       loadData();
     } catch {
       toast.error('Failed to delete profiles');
+    }
+  };
+
+  const handleDuplicateProfile = (profileId) => {
+    try {
+      const copy = duplicateProfile(profileId);
+      if (!copy) {
+        toast.error('Could not duplicate profile');
+        return;
+      }
+      toast.success('Profile duplicated');
+      navigate(`/profiles/edit/${copy.profileId}`);
+    } catch {
+      toast.error('Failed to duplicate profile');
     }
   };
 
@@ -173,6 +195,14 @@ const ProfileManager = () => {
                 onClick={() => navigate(`/profiles/edit/${profile.profileId}`)}
               >
                 Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="small"
+                icon={Copy}
+                onClick={() => handleDuplicateProfile(profile.profileId)}
+              >
+                Duplicate
               </Button>
               <Button
                 variant="danger"

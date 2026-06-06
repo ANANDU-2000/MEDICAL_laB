@@ -8,20 +8,24 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
   Eye,
   EyeOff,
   FileText,
   ListChecks,
   Plus,
   Save,
-  Search,
   Tag,
   Trash2,
   X
 } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { getCurrentUser } from '../../services/authService';
-import { getProfiles, addProfile } from '../../features/shared/dataService';
+import { getProfiles, addProfile, updateProfile } from '../../features/shared/dataService';
+import { REPORT_TEST_TEMPLATES, DEFAULT_DROPDOWN_OPTIONS } from '../../data/urineTemplates';
+import ProfileTestToolbar from '../../components/profiles/ProfileTestToolbar';
+import CatalogSidebar from '../../components/profiles/CatalogSidebar';
+import UrineTemplatePicker from '../../components/profiles/UrineTemplatePicker';
 import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 import './ProfileEditorWorkspace.css';
@@ -40,7 +44,6 @@ const REFERENCE_MODE_OPTIONS = [
   { value: 'custom', label: 'Custom multiline' }
 ];
 
-const DEFAULT_DROPDOWN_OPTIONS = 'Negative\nPositive';
 const DEFAULT_POSITIVE_NEGATIVE_SCALE = [
   { symbol: '-', label: 'Negative', value: '' },
   { symbol: '+/-', label: 'Positive', value: '15 mg/dL' },
@@ -149,196 +152,6 @@ const EXTRA_REFERENCE_TEMPLATES = [
 
 const ALL_REFERENCE_PRESETS = [...REFERENCE_PRESETS, ...EXTRA_REFERENCE_TEMPLATES];
 
-const REPORT_TEST_TEMPLATES = [
-  {
-    label: 'Urine colour',
-    displayName: 'COLOUR',
-    sectionName: 'PHYSICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: '',
-    bioReference: 'Pale Yellow',
-    resultOptions: '',
-    referenceMode: 'text'
-  },
-  {
-    label: 'Urine appearance',
-    displayName: 'APPEARENCE',
-    sectionName: 'PHYSICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: '',
-    bioReference: 'Clear',
-    resultOptions: '',
-    referenceMode: 'text'
-  },
-  {
-    label: 'Urine reaction',
-    displayName: 'REACTION',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: '',
-    bioReference: 'Acidic',
-    resultOptions: '',
-    referenceMode: 'text'
-  },
-  {
-    label: 'Albumin urine',
-    displayName: 'ALBUMIN',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Protein Error principle using tetrabromophenol blue',
-    bioReference: '- : Negative\n+/- : Positive (15 mg/dL)\n+ : Positive (30 mg/dL)\n++ : Positive (100 mg/dL)\n+++ : Positive (300 mg/dL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Sugar urine',
-    displayName: 'SUGAR',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Glucose oxidase - peroxidase method',
-    bioReference: '- : Negative\n+/- : Positive (100 mg/dL)\n+ : Positive (250 mg/dL)\n++ : Positive (500 mg/dL)\n+++ : Positive (1000 mg/dL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Specific gravity',
-    displayName: 'SPECIFIC GRAVITY',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'number',
-    method: 'Based on pKa change of pretreated polyelectrolytes',
-    bioReference: '1.000 - 1.030',
-    resultOptions: '',
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Urine pH',
-    displayName: 'URINE PH',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'number',
-    method: 'Using pH indicators',
-    bioReference: '5.0 - 9.0',
-    resultOptions: '',
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Urobilinogen',
-    displayName: 'UROBILINOGEN',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Ehrlich Reaction',
-    bioReference: '- : Negative\n+/- : Positive (1 mg/dL)\n+ : Positive (2 mg/dL)\n++ : Positive (4 mg/dL)\n+++ : Positive (8 mg/dL)\n++++ : Positive (12 mg/dL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Acetone urine',
-    displayName: 'ACETONE URINE',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Nitroprusside Reaction',
-    bioReference: '- : Negative\n+/- : Positive (5 mg/dL)\n+ : Positive (15 mg/dL)\n++ : Positive (40 mg/dL)\n+++ : Positive (80 mg/dL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Bilirubin urine',
-    displayName: 'BILIRUBIN URINE',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Azo coupling reaction with diazonium salt',
-    bioReference: '- : Negative\n+ : Positive (1 mg/dL)\n++ : Positive (2 mg/dL)\n+++ : Positive (4 mg/dL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Nitrites',
-    displayName: 'NITRITES',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Griess Reaction',
-    bioReference: 'Negative / Positive',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'text'
-  },
-  {
-    label: 'Blood urine',
-    displayName: 'BLOOD - URINE',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Peroxidase activity of haemoglobin/Manual microscopy',
-    bioReference: 'Negative / Positive',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'text'
-  },
-  {
-    label: 'Leucocyte',
-    displayName: 'LEUCOCYTE',
-    sectionName: 'CHEMICAL EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Detection of Leukocyte Esterase',
-    bioReference: '- : Negative\n+/- : Positive (15 Leu/uL)\n+ : Positive (70 Leu/uL)\n++ : Positive (125 Leu/uL)\n+++ : Positive (500 Leu/uL)',
-    resultOptions: DEFAULT_DROPDOWN_OPTIONS,
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Pus cells',
-    displayName: 'PUS CELLS',
-    sectionName: 'MICROSCOPIC EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: 'Manual Microscopy',
-    bioReference: '- : Negative\n+/- : 15 Leu/uL\n+ : 70 Leu/uL\n++ : 125 Leu/uL\n+++ : 500 Leu/uL',
-    resultOptions: '',
-    referenceMode: 'custom'
-  },
-  {
-    label: 'RBC cells',
-    displayName: 'RBC CELLS',
-    sectionName: 'MICROSCOPIC EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: 'Manual Microscopy',
-    bioReference: '- : Negative\n+/- : 10 Ery/uL\n+ : 25 Ery/uL\n++ : 80 Ery/uL\n+++ : 200 Ery/uL',
-    resultOptions: '',
-    referenceMode: 'custom'
-  },
-  {
-    label: 'Epithelial cells',
-    displayName: 'EPITHELIAL CELLS',
-    sectionName: 'MICROSCOPIC EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'text',
-    method: 'Manual Microscopy',
-    bioReference: '0-2 /HPF',
-    resultOptions: '',
-    referenceMode: 'text'
-  },
-  {
-    label: 'Casts / crystals / bacteria',
-    displayName: 'CAST CELLS',
-    sectionName: 'MICROSCOPIC EXAMINATION, URINE',
-    sampleType: 'URINE',
-    inputType: 'select',
-    method: 'Manual Microscopy',
-    bioReference: 'Not Seen /HPF',
-    resultOptions: 'Not seen\nSeen',
-    referenceMode: 'text'
-  }
-];
-
 const EMPTY_NEW_TEST = {
   reportTemplateName: '',
   displayName: '',
@@ -427,23 +240,11 @@ function getReferenceMode(test, refLow, refHigh) {
   return 'custom';
 }
 
-function collectCatalogTests() {
-  const profiles = getProfiles();
-  const map = new Map();
-  profiles.forEach((p) => {
-    (p.tests || []).forEach((t) => {
-      const name = (t.name || t.description || '').trim();
-      const unit = (t.unit || '').trim();
-      const key = `${name}|${unit}|${(t.bioReference || '').slice(0, 40)}`;
-      if (name && !map.has(key)) {
-        map.set(key, {
-          ...t,
-          _sourceProfile: p.name
-        });
-      }
-    });
+function cloneTestObject(sourceTest, newTestId) {
+  return normalizeTestForEditor({
+    ...sourceTest,
+    testId: newTestId || `TEST_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   });
-  return Array.from(map.values());
 }
 
 function normalizeTestForEditor(test = {}) {
@@ -535,7 +336,9 @@ const ProfileEditorWorkspace = () => {
   });
   const [newTest, setNewTest] = useState(() => ({ ...EMPTY_NEW_TEST }));
   const [collapsed, setCollapsed] = useState({});
-  const [pickerQuery, setPickerQuery] = useState('');
+  const [tableQuery, setTableQuery] = useState('');
+  const [selectedTestIds, setSelectedTestIds] = useState([]);
+  const [focusedTestId, setFocusedTestId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [hasDraft, setHasDraft] = useState(false);
@@ -545,22 +348,31 @@ const ProfileEditorWorkspace = () => {
   const sectionRefs = useRef({});
   const testRefs = useRef({});
 
-  const catalogTests = useMemo(
-    () => collectCatalogTests(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: refresh when catalog changes externally or tests add/remove
-    [catalogVersion, formData.tests.length]
-  );
+  const filteredTableTests = useMemo(() => {
+    const q = tableQuery.trim().toLowerCase();
+    return formData.tests
+      .map((test, idx) => ({ test, idx }))
+      .filter(({ test }) => {
+        if (!q) return true;
+        const normalized = normalizeTestForEditor(test);
+        const haystack = [
+          normalized.displayName,
+          normalized.description,
+          normalized.name,
+          normalized.unit,
+          normalized.sampleType,
+          normalized.sectionName
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+  }, [formData.tests, tableQuery]);
 
-  const filteredPicker = useMemo(() => {
-    const q = pickerQuery.trim().toLowerCase();
-    if (!q) return catalogTests.slice(0, 12);
-    return catalogTests
-      .filter((t) => {
-        const n = (t.name || t.description || '').toLowerCase();
-        return n.includes(q) || (t.unit || '').toLowerCase().includes(q);
-      })
-      .slice(0, 8);
-  }, [catalogTests, pickerQuery]);
+  const filteredTestIds = useMemo(
+    () => filteredTableTests.map(({ test }) => test.testId),
+    [filteredTableTests]
+  );
 
   const backPath = location.pathname.startsWith('/admin/profile-manager')
     ? '/admin/profile-manager'
@@ -697,7 +509,102 @@ const ProfileEditorWorkspace = () => {
       ...prev,
       tests: prev.tests.filter((t) => t.testId !== testId)
     }));
+    setSelectedTestIds((prev) => prev.filter((id) => id !== testId));
+    if (focusedTestId === testId) setFocusedTestId(null);
   };
+
+  const duplicateTestInProfile = (testId) => {
+    setFormData((prev) => {
+      const index = prev.tests.findIndex((t) => t.testId === testId);
+      if (index < 0) return prev;
+      const clone = cloneTestObject(prev.tests[index]);
+      const tests = [...prev.tests];
+      tests.splice(index + 1, 0, clone);
+      return { ...prev, tests };
+    });
+    toast.success('Test duplicated');
+  };
+
+  const duplicateTestsInProfile = (testIds) => {
+    if (!testIds.length) return;
+    setFormData((prev) => {
+      const idSet = new Set(testIds);
+      const tests = [];
+      prev.tests.forEach((test) => {
+        tests.push(test);
+        if (idSet.has(test.testId)) {
+          tests.push(cloneTestObject(test));
+        }
+      });
+      return { ...prev, tests };
+    });
+    toast.success(`${testIds.length} test(s) duplicated`);
+  };
+
+  const removeTestsFromProfile = (testIds) => {
+    if (!testIds.length) return;
+    const idSet = new Set(testIds);
+    setFormData((prev) => ({
+      ...prev,
+      tests: prev.tests.filter((t) => !idSet.has(t.testId))
+    }));
+    setSelectedTestIds((prev) => prev.filter((id) => !idSet.has(id)));
+    if (focusedTestId && idSet.has(focusedTestId)) setFocusedTestId(null);
+  };
+
+  const toggleSelectTest = (testId) => {
+    setSelectedTestIds((prev) =>
+      prev.includes(testId) ? prev.filter((id) => id !== testId) : [...prev, testId]
+    );
+  };
+
+  const toggleSelectAllFilteredTests = () => {
+    const allSelected =
+      filteredTestIds.length > 0 &&
+      filteredTestIds.every((id) => selectedTestIds.includes(id));
+    if (allSelected) {
+      setSelectedTestIds((prev) => prev.filter((id) => !filteredTestIds.includes(id)));
+    } else {
+      setSelectedTestIds((prev) => [...new Set([...prev, ...filteredTestIds])]);
+    }
+  };
+
+  const handleDeleteSelectedTests = () => {
+    const ids = selectedTestIds.filter((id) => filteredTestIds.includes(id));
+    if (!ids.length) {
+      toast.error('No tests selected');
+      return;
+    }
+    if (!confirm(`Remove ${ids.length} selected test(s) from this profile?`)) return;
+    removeTestsFromProfile(ids);
+    toast.success(`${ids.length} test(s) removed`);
+  };
+
+  const handleDuplicateSelectedTests = () => {
+    const ids = selectedTestIds.filter((id) => filteredTestIds.includes(id));
+    if (!ids.length) {
+      toast.error('No tests selected');
+      return;
+    }
+    duplicateTestsInProfile(ids);
+  };
+
+  const handleApplyTemplateFromSidebar = (template) => {
+    if (!focusedTestId) {
+      toast.error('Expand a test row first, then click a template');
+      return;
+    }
+    applyReportTemplate(focusedTestId, template);
+    toast.success(`Applied "${template.label}"`);
+  };
+
+  const activeTestLabel = useMemo(() => {
+    if (!focusedTestId) return '';
+    const test = formData.tests.find((t) => t.testId === focusedTestId);
+    if (!test) return '';
+    const normalized = normalizeTestForEditor(test);
+    return normalized.displayName || normalized.description || normalized.name || '';
+  }, [focusedTestId, formData.tests]);
 
   const moveTest = (testId, direction) => {
     setFormData((prev) => {
@@ -966,20 +873,17 @@ const ProfileEditorWorkspace = () => {
   };
 
   const toggleCollapsed = (testId) => {
-    setCollapsed((s) => ({ ...s, [testId]: !s[testId] }));
+    setCollapsed((s) => {
+      const nextCollapsed = !s[testId];
+      if (!nextCollapsed) setFocusedTestId(testId);
+      return { ...s, [testId]: nextCollapsed };
+    });
   };
 
   const validateAll = () => {
     const e = {};
     if (!formData.name.trim()) e.name = 'Profile name is required';
     if (formData.tests.length === 0) e.tests = 'Add at least one test';
-    const names = formData.tests.map((t) => (t.displayName || t.description || t.name || '').trim().toLowerCase());
-    const seen = new Set();
-    names.forEach((n) => {
-      if (!n) return;
-      if (seen.has(n)) e.tests_dup = 'Duplicate test names are not allowed';
-      seen.add(n);
-    });
     formData.tests.forEach((t, i) => {
       if (!String(t.displayName || t.description || t.name || '').trim()) {
         e[`test_${t.testId}_desc`] = `Test #${i + 1}: description required`;
@@ -1009,7 +913,7 @@ const ProfileEditorWorkspace = () => {
     });
   };
 
-  const persistProfile = () => {
+  const persistProfile = async () => {
     if (!validateAll()) {
       setFormErrors((er) => ({ ...er, _summary: 'Fix the highlighted fields below' }));
       focusFirstError();
@@ -1028,18 +932,16 @@ const ProfileEditorWorkspace = () => {
       };
 
       if (editingProfile) {
-        const allProfiles = JSON.parse(localStorage.getItem('healit_profiles') || '[]');
-        const index = allProfiles.findIndex((p) => p.profileId === editingProfile.profileId);
-        if (index !== -1) {
-          allProfiles[index] = {
-            ...allProfiles[index],
-            ...profileData,
-            updatedBy: currentUser?.userId || 'unknown',
-            updatedByName: currentUser?.fullName || 'Unknown User',
-            updatedAt: new Date().toISOString()
-          };
-          localStorage.setItem('healit_profiles', JSON.stringify(allProfiles));
+        const { synced } = await updateProfile(editingProfile.profileId, {
+          ...profileData,
+          profileId: editingProfile.profileId,
+          updatedBy: currentUser?.userId || 'unknown',
+          updatedByName: currentUser?.fullName || 'Unknown User'
+        });
+        if (synced) {
           toast.success('Profile updated');
+        } else {
+          toast.success('Profile updated locally (server sync failed)');
         }
       } else {
         addProfile(profileData);
@@ -1118,9 +1020,6 @@ const ProfileEditorWorkspace = () => {
     }
     if (formErrors.tests) {
       items.push({ id: 'err-tests', target: 'tests', label: formErrors.tests });
-    }
-    if (formErrors.tests_dup) {
-      items.push({ id: 'err-tests-dup', target: 'tests', label: formErrors.tests_dup });
     }
     formData.tests.forEach((t, i) => {
       const checks = getPrintChecks(t, formData.name);
@@ -1442,57 +1341,34 @@ const ProfileEditorWorkspace = () => {
                 </div>
               </div>
               {formErrors.tests && <div className="pew-field-error" style={{ marginBottom: 12 }}>{formErrors.tests}</div>}
-              {formErrors.tests_dup && (
-                <div className="pew-field-error" style={{ marginBottom: 12 }}>{formErrors.tests_dup}</div>
-              )}
 
-              <div className="pew-picker">
-                <strong style={{ fontSize: '0.875rem', display: 'block', marginBottom: 8 }}>
-                  Add from catalog
-                </strong>
-                <span className="pew-helper" style={{ display: 'block', marginBottom: 8 }}>
-                  Search tests already defined on other profiles and clone into this package.
-                </span>
-                <div className="pew-picker-search">
-                  <Search size={18} />
-                  <input
-                    type="search"
-                    value={pickerQuery}
-                    onChange={(e) => setPickerQuery(e.target.value)}
-                    placeholder="Search by test name or unit…"
-                    aria-label="Search catalog tests"
+              <div className="pew-tests-layout">
+                <div className="pew-tests-main">
+                  <ProfileTestToolbar
+                    searchQuery={tableQuery}
+                    onSearchChange={setTableQuery}
+                    searchPlaceholder="Search tests in this profile…"
+                    filteredCount={filteredTableTests.length}
+                    totalCount={formData.tests.length}
+                    selectedCount={selectedTestIds.filter((id) => filteredTestIds.includes(id)).length}
+                    onSelectAll={toggleSelectAllFilteredTests}
+                    onDeleteSelected={handleDeleteSelectedTests}
+                    onDuplicateSelected={handleDuplicateSelectedTests}
                   />
-                </div>
-                <div className="pew-picker-results">
-                  {filteredPicker.length === 0 ? (
-                    <div className="pew-picker-row" style={{ cursor: 'default', color: '#94a3b8' }}>
-                      No matches
-                    </div>
-                  ) : (
-                    filteredPicker.map((t) => (
-                      <div
-                        key={`${t.name}_${t.unit}_${t._sourceProfile}`}
-                        className="pew-picker-row"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && cloneCatalogTestIntoProfile(t)}
-                        onClick={() => cloneCatalogTestIntoProfile(t)}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{t.name || t.description}</div>
-                          <div className="pew-picker-meta">
-                            {t.unit || '—'} · from {t._sourceProfile}
-                          </div>
-                        </div>
-                        <Plus size={18} color="#0d9488" />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
 
               <div className="pew-test-table" role="table" aria-label="Tests in package">
                 <div className="pew-test-table-head" role="row">
+                  <span className="pew-test-check-col">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible tests"
+                      checked={
+                        filteredTableTests.length > 0 &&
+                        filteredTableTests.every(({ test }) => selectedTestIds.includes(test.testId))
+                      }
+                      onChange={toggleSelectAllFilteredTests}
+                    />
+                  </span>
                   <span aria-hidden="true" />
                   <span>Test name</span>
                   <span>Unit</span>
@@ -1503,7 +1379,12 @@ const ProfileEditorWorkspace = () => {
                   <span>Print</span>
                   <span>Actions</span>
                 </div>
-                {formData.tests.map((test, idx) => {
+                {filteredTableTests.length === 0 ? (
+                  <div className="pew-test-table-empty">
+                    {formData.tests.length === 0 ? 'No tests yet — add from the catalog sidebar.' : 'No tests match your search.'}
+                  </div>
+                ) : (
+                filteredTableTests.map(({ test, idx }) => {
                   const normalized = normalizeTestForEditor(test);
                   const isCollapsed = collapsed[test.testId] !== false;
                   const resultTypeLabel =
@@ -1515,10 +1396,18 @@ const ProfileEditorWorkspace = () => {
                       key={test.testId}
                       className={`pew-test-card ${isCollapsed ? 'pew-test-card--collapsed' : ''} ${
                         testHasError(test.testId) ? 'pew-test-card--error' : ''
-                      }`}
+                      } ${focusedTestId === test.testId ? 'pew-test-card--focused' : ''}`}
                       ref={(el) => (testRefs.current[test.testId] = el)}
                     >
                       <div className="pew-test-row" role="row">
+                        <span className="pew-test-check-col">
+                          <input
+                            type="checkbox"
+                            checked={selectedTestIds.includes(test.testId)}
+                            onChange={() => toggleSelectTest(test.testId)}
+                            aria-label={`Select test ${idx + 1}`}
+                          />
+                        </span>
                         <button
                           type="button"
                           className="pew-test-toggle"
@@ -1555,6 +1444,13 @@ const ProfileEditorWorkspace = () => {
                         <div className="pew-test-actions">
                           <button
                             type="button"
+                            onClick={() => duplicateTestInProfile(test.testId)}
+                            title="Duplicate test"
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => moveTest(test.testId, -1)}
                             disabled={idx === 0}
                             title="Move up"
@@ -1573,7 +1469,11 @@ const ProfileEditorWorkspace = () => {
                             type="button"
                             className="pew-test-remove"
                             title="Remove test"
-                            onClick={() => removeTestFromProfile(test.testId)}
+                            onClick={() => {
+                              if (confirm('Remove this test from the profile?')) {
+                                removeTestFromProfile(test.testId);
+                              }
+                            }}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1606,7 +1506,7 @@ const ProfileEditorWorkspace = () => {
                           ))}
                         </select>
                         <div className="pew-template-grid">
-                          {REPORT_TEST_TEMPLATES.slice(0, 10).map((template) => (
+                          {REPORT_TEST_TEMPLATES.map((template) => (
                             <button
                               key={template.label}
                               type="button"
@@ -1900,7 +1800,20 @@ const ProfileEditorWorkspace = () => {
                   </div>
                 </div>
                   );
-                })}
+                })
+                )}
+              </div>
+                </div>
+                <div className="pew-tests-sidebar">
+                  <CatalogSidebar
+                    onAddTest={cloneCatalogTestIntoProfile}
+                    catalogVersion={catalogVersion}
+                  />
+                  <UrineTemplatePicker
+                    onApply={handleApplyTemplateFromSidebar}
+                    activeTestLabel={activeTestLabel}
+                  />
+                </div>
               </div>
 
               <div className="pew-section" style={{ marginTop: 20, background: '#f8fafc' }}>
@@ -1930,7 +1843,7 @@ const ProfileEditorWorkspace = () => {
                       ))}
                     </select>
                     <div className="pew-template-grid">
-                      {REPORT_TEST_TEMPLATES.slice(0, 10).map((template) => (
+                      {REPORT_TEST_TEMPLATES.map((template) => (
                         <button
                           key={template.label}
                           type="button"

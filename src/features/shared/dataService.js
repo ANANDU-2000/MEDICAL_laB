@@ -232,17 +232,94 @@ export const addProfile = (profileData) => {
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
   const newProfile = {
     ...profileData,
-    profileId: `PROF_${Date.now()}`,
-    active: true,
-    createdAt: new Date().toISOString()
+    profileId: profileData.profileId || `PROF_${Date.now()}`,
+    active: profileData.active !== false,
+    createdAt: profileData.createdAt || new Date().toISOString()
   };
   profiles.push(newProfile);
   localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+  dispatchDataUpdate('profiles');
 
-  // Sync to Server
   apiCall('/profiles', 'POST', newProfile);
 
   return newProfile;
+};
+
+export const updateProfile = async (profileId, profileData) => {
+  const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+  const index = profiles.findIndex((p) => p.profileId === profileId);
+  if (index === -1) return { profile: null, synced: false };
+
+  const updated = {
+    ...profiles[index],
+    ...profileData,
+    profileId,
+    updatedAt: new Date().toISOString()
+  };
+  profiles[index] = updated;
+  localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+  dispatchDataUpdate('profiles');
+
+  const apiResult = await apiCall(`/profiles/${profileId}`, 'PUT', updated);
+  const synced = apiResult?.success !== false && apiResult !== null;
+
+  return { profile: updated, synced };
+};
+
+export const deleteProfile = async (profileId) => {
+  const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+  const updatedProfiles = profiles.filter((p) => p.profileId !== profileId);
+  if (updatedProfiles.length === profiles.length) return { deleted: false, synced: false };
+
+  localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(updatedProfiles));
+  dispatchDataUpdate('profiles');
+
+  const apiResult = await apiCall(`/profiles/${profileId}`, 'DELETE');
+  const synced = apiResult?.success !== false && apiResult !== null;
+
+  return { deleted: true, synced };
+};
+
+export const deleteProfiles = async (profileIds) => {
+  if (!profileIds?.length) return { deletedCount: 0, synced: true };
+
+  const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+  const idSet = new Set(profileIds);
+  const updatedProfiles = profiles.filter((p) => !idSet.has(p.profileId));
+  const deletedCount = profiles.length - updatedProfiles.length;
+
+  localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(updatedProfiles));
+  dispatchDataUpdate('profiles');
+
+  const results = await Promise.all(profileIds.map((id) => apiCall(`/profiles/${id}`, 'DELETE')));
+  const synced = results.every((r) => r?.success !== false && r !== null);
+
+  return { deletedCount, synced };
+};
+
+export const duplicateProfile = (profileId) => {
+  const source = getProfileById(profileId);
+  if (!source) return null;
+
+  const newProfileId = `PROF_${Date.now()}`;
+  const clonedTests = (source.tests || []).map((test, idx) => ({
+    ...test,
+    testId: `TEST_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`
+  }));
+
+  const duplicate = {
+    ...source,
+    profileId: newProfileId,
+    name: `${source.name} (Copy)`,
+    testIds: clonedTests.map((t) => t.testId),
+    tests: clonedTests,
+    createdAt: new Date().toISOString(),
+    updatedAt: undefined,
+    updatedBy: undefined,
+    updatedByName: undefined
+  };
+
+  return addProfile(duplicate);
 };
 
 // Patient Operations
@@ -568,6 +645,10 @@ export default {
   getProfileById,
   getProfileWithTests,
   addProfile,
+  updateProfile,
+  deleteProfile,
+  deleteProfiles,
+  duplicateProfile,
   getPatients,
   getPatientById,
   addPatient,

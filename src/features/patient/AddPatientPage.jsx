@@ -6,6 +6,7 @@ import { getProfiles, addPatient, createVisit, getSettings } from '../../feature
 import { getCurrentUser } from '../../services/authService';
 import { useAuthStore } from '../../store';
 import Button from '../../components/ui/Button';
+import ProfileTestToolbar from '../../components/profiles/ProfileTestToolbar';
 import './AddPatient.css';
 
 const AddPatientPage = () => {
@@ -30,6 +31,7 @@ const AddPatientPage = () => {
   const [selectedProfiles, setSelectedProfiles] = useState([]); // Changed to array for multiple profiles
   const [tests, setTests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRowIds, setSelectedRowIds] = useState([]);
   const [profileSearchTerm, setProfileSearchTerm] = useState(''); // NEW: Search for profiles
   const [showProfileDropdown, setShowProfileDropdown] = useState(false); // NEW: Control dropdown visibility
   const [discount, setDiscount] = useState(0);
@@ -139,6 +141,7 @@ const AddPatientPage = () => {
   // Remove test
   const handleRemoveTest = (testId) => {
     setTests(prev => prev.filter(t => t.id !== testId));
+    setSelectedRowIds(prev => prev.filter(id => id !== testId));
   };
   
   // Add new test
@@ -246,6 +249,38 @@ const AddPatientPage = () => {
     t.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredTestIds = filteredTests.map(t => t.id);
+
+  const toggleSelectRow = (testId) => {
+    setSelectedRowIds(prev =>
+      prev.includes(testId) ? prev.filter(id => id !== testId) : [...prev, testId]
+    );
+  };
+
+  const toggleSelectAllFilteredRows = () => {
+    const allSelected =
+      filteredTestIds.length > 0 &&
+      filteredTestIds.every(id => selectedRowIds.includes(id));
+    if (allSelected) {
+      setSelectedRowIds(prev => prev.filter(id => !filteredTestIds.includes(id)));
+    } else {
+      setSelectedRowIds(prev => [...new Set([...prev, ...filteredTestIds])]);
+    }
+  };
+
+  const handleDeleteSelectedRows = () => {
+    const ids = selectedRowIds.filter(id => filteredTestIds.includes(id));
+    if (!ids.length) {
+      toast.error('No tests selected');
+      return;
+    }
+    if (!confirm(`Remove ${ids.length} selected test(s)?`)) return;
+    const idSet = new Set(ids);
+    setTests(prev => prev.filter(t => !idSet.has(t.id)));
+    setSelectedRowIds(prev => prev.filter(id => !idSet.has(id)));
+    toast.success(`${ids.length} test(s) removed`);
+  };
   
   // Get test suggestions for autocomplete
   const testSuggestions = searchTerm.length >= 2
@@ -661,11 +696,35 @@ const AddPatientPage = () => {
               Add Blank
             </Button>
           </div>
+
+          <ProfileTestToolbar
+            searchQuery={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Filter tests in table…"
+            filteredCount={filteredTests.length}
+            totalCount={tests.length}
+            selectedCount={selectedRowIds.filter(id => filteredTestIds.includes(id)).length}
+            onSelectAll={toggleSelectAllFilteredRows}
+            onDeleteSelected={handleDeleteSelectedRows}
+            showDuplicate={false}
+            className="add-patient-test-toolbar"
+          />
           
           <div className="table-container">
             <table className="tests-table">
               <thead>
                 <tr>
+                  <th style={{ width: '36px' }}>
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible tests"
+                      checked={
+                        filteredTests.length > 0 &&
+                        filteredTests.every(t => selectedRowIds.includes(t.id))
+                      }
+                      onChange={toggleSelectAllFilteredRows}
+                    />
+                  </th>
                   <th style={{ width: '40px' }}>✓</th>
                   <th style={{ width: '40%' }}>Test Description</th>
                   <th style={{ width: '20%' }}>Value</th>
@@ -677,13 +736,21 @@ const AddPatientPage = () => {
               <tbody>
                 {filteredTests.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="empty-state">
+                    <td colSpan="7" className="empty-state">
                       {selectedProfiles.length > 0 ? 'No tests in selected profiles' : 'Select profiles or add tests manually'}
                     </td>
                   </tr>
                 ) : (
                   filteredTests.map((test) => (
                     <tr key={test.id} className={!test.selected ? 'deselected' : ''}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedRowIds.includes(test.id)}
+                          onChange={() => toggleSelectRow(test.id)}
+                          aria-label={`Select ${test.name || 'test'} for bulk actions`}
+                        />
+                      </td>
                       <td>
                         <input
                           type="checkbox"

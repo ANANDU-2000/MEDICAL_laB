@@ -579,6 +579,18 @@ const ResultEntryPage = () => {
     });
   };
 
+  const handleSelectAllAvailableTests = () => {
+    setMultiSelectMode(true);
+    const addable = availableTests.filter(
+      (test) => !visit.tests.some((t) => t.testId === test.testId)
+    );
+    setSelectedTestsToAdd(addable);
+  };
+
+  const handleDeselectAllAvailableTests = () => {
+    setSelectedTestsToAdd([]);
+  };
+
   // Add multiple tests
   const handleAddMultipleTests = () => {
     if (selectedTestsToAdd.length === 0) {
@@ -1922,6 +1934,26 @@ ${currentUser?.fullName || 'Lab Team'}`;
               >
                 {multiSelectMode ? '✓ Multi-Select ON' : 'Multi-Select OFF'}
               </button>
+              {availableTests.length > 0 && (
+                <>
+                  <button
+                    className="multi-select-toggle"
+                    onClick={handleSelectAllAvailableTests}
+                    type="button"
+                  >
+                    Select All
+                  </button>
+                  {selectedTestsToAdd.length > 0 && (
+                    <button
+                      className="multi-select-toggle"
+                      onClick={handleDeselectAllAvailableTests}
+                      type="button"
+                    >
+                      Deselect All
+                    </button>
+                  )}
+                </>
+              )}
               {multiSelectMode && selectedTestsToAdd.length > 0 && (
                 <button
                   className="add-selected-btn"

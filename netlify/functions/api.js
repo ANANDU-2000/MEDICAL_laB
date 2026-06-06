@@ -311,6 +311,40 @@ router.post('/profiles', async (req, res) => {
   }
 });
 
+router.put('/profiles/:profileId', async (req, res) => {
+  try {
+    if (!req.dbConnected) {
+      return res.status(503).json({ success: false, error: 'Database not connected', code: 'DB_OFFLINE' });
+    }
+    const profile = await Profile.findOneAndUpdate(
+      { profileId: req.params.profileId },
+      req.body,
+      { new: true, upsert: false }
+    );
+    if (!profile) {
+      return res.status(404).json({ success: false, error: 'Profile not found' });
+    }
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.delete('/profiles/:profileId', async (req, res) => {
+  try {
+    if (!req.dbConnected) {
+      return res.status(503).json({ success: false, error: 'Database not connected', code: 'DB_OFFLINE' });
+    }
+    const profile = await Profile.findOneAndDelete({ profileId: req.params.profileId });
+    if (!profile) {
+      return res.status(404).json({ success: false, error: 'Profile not found' });
+    }
+    res.json({ success: true, message: 'Profile deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.post('/tests', async (req, res) => {
   try {
     const test = new TestMaster(req.body);
