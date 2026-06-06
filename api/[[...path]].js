@@ -1,5 +1,7 @@
 /**
- * Vercel serverless catch-all — reuses the same Express API as Netlify Functions.
+ * Vercel serverless catch-all — exports Express app directly (Vercel-native).
  * Requires MONGODB_URI in Vercel Project Settings → Environment Variables.
  */
-export { handler as default } from '../netlify/functions/api.js';
+import { app } from '../netlify/functions/api.js';
+
+export default app;
