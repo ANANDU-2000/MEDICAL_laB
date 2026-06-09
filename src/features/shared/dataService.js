@@ -1,5 +1,6 @@
 // LocalStorage Data Service - Acts as Backend
 import PROFILES from '../../data/seed/profiles';
+import { mergeProfilesById, mergeTestsMasterById, safeMergeArray } from '../../utils/syncMergeUtils';
 
 const STORAGE_KEYS = {
   TESTS_MASTER: 'healit_tests_master',
@@ -87,10 +88,11 @@ export const initializeSeedData = async () => {
         console.warn('⚠️ Database not configured - running in local-only mode');
         // Continue to load local data...
       }
-      // Case 2: Server has data - Sync down (Server Wins)
+      // Case 2: Server has data - Sync down (merge profiles/tests safely)
       else if (res.data && (
         (res.data.patients && res.data.patients.length > 0) ||
-        (res.data.visits && res.data.visits.length > 0)
+        (res.data.visits && res.data.visits.length > 0) ||
+        (res.data.profiles && res.data.profiles.length > 0)
       )) {
         console.log('📥 Downloading data from server...');
         const { patients, visits, results, invoices, settings, profiles, testsMaster } = res.data;
@@ -100,8 +102,22 @@ export const initializeSeedData = async () => {
         if (results) localStorage.setItem(STORAGE_KEYS.RESULTS, JSON.stringify(results));
         if (invoices) localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
         if (settings && Object.keys(settings).length > 0) localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-        if (profiles && profiles.length > 0) localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
-        if (testsMaster && testsMaster.length > 0) localStorage.setItem(STORAGE_KEYS.TESTS_MASTER, JSON.stringify(testsMaster));
+
+        if (Array.isArray(profiles)) {
+          const localProfiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
+          const { merged, skippedEmptyServer } = safeMergeArray(localProfiles, profiles, mergeProfilesById);
+          if (!skippedEmptyServer) {
+            localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(merged));
+          }
+        }
+
+        if (Array.isArray(testsMaster)) {
+          const localTests = JSON.parse(localStorage.getItem(STORAGE_KEYS.TESTS_MASTER) || '[]');
+          const { merged, skippedEmptyServer } = safeMergeArray(localTests, testsMaster, mergeTestsMasterById);
+          if (!skippedEmptyServer) {
+            localStorage.setItem(STORAGE_KEYS.TESTS_MASTER, JSON.stringify(merged));
+          }
+        }
 
         console.log('✅ Synced with server successfully');
         dispatchDataUpdate('all');

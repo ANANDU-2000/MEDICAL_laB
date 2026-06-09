@@ -344,7 +344,6 @@ const ProfileEditorWorkspace = () => {
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
-  const isAdmin = role === 'admin';
   const [editingProfile, setEditingProfile] = useState(null);
   const [formData, setFormData] = useState({
     name: '',

@@ -137,7 +137,12 @@ export class DataMigrationService {
             mergeProfilesById
           );
           if (skippedEmptyServer) {
-            console.warn('Skipping profile overwrite: server empty, local has data');
+            console.warn('Skipping profile overwrite: server empty, local has data — uploading local profiles');
+            try {
+              await apiService.syncAllData({ profiles: localProfiles });
+            } catch (uploadErr) {
+              console.warn('Profile upload after skip failed:', uploadErr);
+            }
           } else {
             localStorage.setItem('healit_profiles', JSON.stringify(merged));
           }
@@ -151,7 +156,12 @@ export class DataMigrationService {
             mergeTestsMasterById
           );
           if (skippedEmptyServer) {
-            console.warn('Skipping testsMaster overwrite: server empty, local has data');
+            console.warn('Skipping testsMaster overwrite: server empty, local has data — uploading local tests');
+            try {
+              await apiService.syncAllData({ testsMaster: localTests });
+            } catch (uploadErr) {
+              console.warn('TestsMaster upload after skip failed:', uploadErr);
+            }
           } else {
             localStorage.setItem('healit_tests_master', JSON.stringify(merged));
           }
