@@ -178,7 +178,9 @@ class SyncService {
                 localData.visits.length > 0 ||
                 localData.results.length > 0 ||
                 localData.invoices.length > 0 ||
-                localData.financialExpenses.length > 0;
+                localData.financialExpenses.length > 0 ||
+                localData.profiles.length > 0 ||
+                localData.testsMaster.length > 0;
 
             if (hasLocalData) {
                 try {

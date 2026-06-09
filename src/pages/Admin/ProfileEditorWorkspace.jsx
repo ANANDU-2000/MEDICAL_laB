@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { getCurrentUser } from '../../services/authService';
-import { getProfiles, addProfile, updateProfile } from '../../features/shared/dataService';
+import { getProfileById, addProfile, updateProfile } from '../../features/shared/dataService';
 import { REPORT_TEST_TEMPLATES, DEFAULT_DROPDOWN_OPTIONS } from '../../data/urineTemplates';
 import ProfileTestToolbar from '../../components/profiles/ProfileTestToolbar';
 import CatalogSidebar from '../../components/profiles/CatalogSidebar';
@@ -279,10 +279,26 @@ function normalizeTestForEditor(test = {}) {
     referenceMode,
     positiveNegativeScale,
     printVisible: test.printVisible !== false,
+    price: test.price === '' || test.price === undefined || test.price === null
+      ? 0
+      : (parseFloat(test.price) || 0),
     resultOptions: Array.isArray(test.resultOptions || test.options)
       ? (test.resultOptions || test.options).join('\n')
       : (test.resultOptions || test.options || '')
   };
+}
+
+function hydrateProfileTests(profile) {
+  if (!profile) return [];
+  if (Array.isArray(profile.tests) && profile.tests.length > 0) {
+    return profile.tests.map(normalizeTestForEditor);
+  }
+  if (!Array.isArray(profile.testIds) || profile.testIds.length === 0) return [];
+  const testsMaster = JSON.parse(localStorage.getItem('healit_tests_master') || '[]');
+  return profile.testIds
+    .map((testId) => testsMaster.find((t) => t.testId === testId))
+    .filter(Boolean)
+    .map(normalizeTestForEditor);
 }
 
 function formatPreviewResult(test) {
@@ -327,6 +343,8 @@ const ProfileEditorWorkspace = () => {
   const resolvedProfileId = profileId || null;
 
   const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const isAdmin = role === 'admin';
   const [editingProfile, setEditingProfile] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -405,9 +423,8 @@ const ProfileEditorWorkspace = () => {
       setHasDraft(false);
       return;
     }
-    const profiles = getProfiles();
-    const p = profiles.find((x) => x.profileId === resolvedProfileId);
-    if (!p) {
+    const p = getProfileById(resolvedProfileId);
+    if (!p || p.active === false) {
       toast.error('Profile not found');
       navigate(backPath);
       return;
@@ -436,7 +453,7 @@ const ProfileEditorWorkspace = () => {
         name: p.name,
         description: p.description || '',
         packagePrice: p.packagePrice || '',
-        tests: (p.tests || []).map(normalizeTestForEditor)
+        tests: hydrateProfileTests(p)
       });
       setHasDraft(false);
     }
@@ -916,9 +933,12 @@ const ProfileEditorWorkspace = () => {
   const persistProfile = async () => {
     if (!validateAll()) {
       setFormErrors((er) => ({ ...er, _summary: 'Fix the highlighted fields below' }));
+      toast.error('Please fix highlighted fields before saving');
       focusFirstError();
       return;
     }
+    if (saving) return;
+    setSaving(true);
     try {
       const profileData = {
         name: formData.name,
@@ -932,27 +952,41 @@ const ProfileEditorWorkspace = () => {
       };
 
       if (editingProfile) {
-        const { synced } = await updateProfile(editingProfile.profileId, {
+        const { profile, synced, error } = await updateProfile(editingProfile.profileId, {
           ...profileData,
           profileId: editingProfile.profileId,
           updatedBy: currentUser?.userId || 'unknown',
           updatedByName: currentUser?.fullName || 'Unknown User'
         });
+        if (!profile) {
+          toast.error(error || 'Profile not found — could not save');
+          return;
+        }
         if (synced) {
-          toast.success('Profile updated');
+          toast.success('Profile saved to cloud');
         } else {
-          toast.success('Profile updated locally (server sync failed)');
+          toast.success('Profile saved on this device (cloud sync failed)');
         }
       } else {
-        addProfile(profileData);
-        toast.success('Profile created');
+        const { profile, synced, error } = await addProfile(profileData);
+        if (!profile) {
+          toast.error(error || 'Could not create profile');
+          return;
+        }
+        if (synced) {
+          toast.success('Profile created and saved to cloud');
+        } else {
+          toast.success('Profile created on this device (cloud sync failed)');
+        }
       }
       localStorage.removeItem(draftStorageKey(isNew, resolvedProfileId));
       setHasDraft(false);
       navigate(backPath);
     } catch (err) {
-      toast.error('Failed to save');
+      toast.error('Failed to save profile');
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -2345,7 +2379,7 @@ const ProfileEditorWorkspace = () => {
         <Button variant="ghost" onClick={goBack}>
           Cancel
         </Button>
-        <Button icon={Save} onClick={persistProfile}>
+        <Button icon={Save} onClick={persistProfile} loading={saving} disabled={saving}>
           {editingProfile ? 'Update profile' : 'Create profile'}
         </Button>
       </footer>

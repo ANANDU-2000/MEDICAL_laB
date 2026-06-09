@@ -68,7 +68,7 @@ function App() {
         console.log('Initializing app with multi-device sync...');
 
         // Initialize seed data (for first-time users)
-        initializeSeedData();
+        await initializeSeedData();
         initializeAuthData();
 
         // Preload critical images for PDFs and UI

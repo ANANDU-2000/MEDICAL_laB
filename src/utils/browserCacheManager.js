@@ -18,7 +18,10 @@ const CACHE_CONFIG = {
     'financial-storage', // Financial data persistence
     'activity-storage', // Staff activity logs
     'healit_users', // User data
+    'healit_profiles', // Test profiles
+    'healit_tests_master', // Test master catalog
     'healit_data_version', // Data version tracker
+    'data_migrated_to_api', // Migration flag
     'last_cache_clear', // Cache clear timestamp
   ]
 };

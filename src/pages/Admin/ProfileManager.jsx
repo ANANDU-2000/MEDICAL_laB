@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit2, Trash2, Package, Copy } from 'lucide-react';
 import { getProfiles, deleteProfile, deleteProfiles, duplicateProfile } from '../../features/shared/dataService';
+import { useAuthStore } from '../../store';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import toast from 'react-hot-toast';
@@ -9,31 +10,47 @@ import './ProfileManager.css';
 
 const ProfileManager = () => {
   const navigate = useNavigate();
+  const { role } = useAuthStore();
+  const isAdmin = role === 'admin';
   const [profiles, setProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProfiles, setSelectedProfiles] = useState([]);
 
-  // Load data
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = () => {
     setProfiles(getProfiles());
   };
+
+  useEffect(() => {
+    loadData();
+    const onDataUpdate = (event) => {
+      if (!event.detail?.type || event.detail.type === 'profiles' || event.detail.type === 'all') {
+        loadData();
+      }
+    };
+    window.addEventListener('healit-data-update', onDataUpdate);
+    return () => window.removeEventListener('healit-data-update', onDataUpdate);
+  }, []);
 
   const filteredProfiles = profiles.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const denyStaffDelete = () => {
+    toast.error('Only admin can delete profiles. Contact admin.');
+  };
+
   const handleDeleteProfile = async (profileId) => {
+    if (!isAdmin) {
+      denyStaffDelete();
+      return;
+    }
     if (!confirm('Are you sure you want to DELETE this profile permanently? This cannot be undone.')) return;
 
     try {
-      const { deleted, synced } = await deleteProfile(profileId);
+      const { deleted, synced, error } = await deleteProfile(profileId, role);
       if (!deleted) {
-        toast.error('Profile not found');
+        toast.error(error || 'Profile not found');
         return;
       }
       toast.success(synced ? 'Profile deleted successfully' : 'Profile deleted locally (server sync failed)');
@@ -45,6 +62,10 @@ const ProfileManager = () => {
   };
 
   const handleDeleteSelected = async () => {
+    if (!isAdmin) {
+      denyStaffDelete();
+      return;
+    }
     if (selectedProfiles.length === 0) {
       toast.error('No profiles selected');
       return;
@@ -53,9 +74,9 @@ const ProfileManager = () => {
     if (!confirm(`Delete ${selectedProfiles.length} selected profile(s)? This cannot be undone.`)) return;
 
     try {
-      const { deletedCount, synced } = await deleteProfiles(selectedProfiles);
+      const { deletedCount, synced, error } = await deleteProfiles(selectedProfiles, role);
       if (deletedCount === 0) {
-        toast.error('No profiles were deleted');
+        toast.error(error || 'No profiles were deleted');
         return;
       }
       toast.success(
@@ -70,9 +91,9 @@ const ProfileManager = () => {
     }
   };
 
-  const handleDuplicateProfile = (profileId) => {
+  const handleDuplicateProfile = async (profileId) => {
     try {
-      const copy = duplicateProfile(profileId);
+      const copy = await duplicateProfile(profileId);
       if (!copy) {
         toast.error('Could not duplicate profile');
         return;
@@ -85,6 +106,7 @@ const ProfileManager = () => {
   };
 
   const toggleSelectProfile = (profileId) => {
+    if (!isAdmin) return;
     setSelectedProfiles(prev =>
       prev.includes(profileId)
         ? prev.filter(id => id !== profileId)
@@ -93,6 +115,7 @@ const ProfileManager = () => {
   };
 
   const toggleSelectAll = () => {
+    if (!isAdmin) return;
     if (selectedProfiles.length === filteredProfiles.length) {
       setSelectedProfiles([]);
     } else {
@@ -112,7 +135,6 @@ const ProfileManager = () => {
         </Button>
       </div>
 
-      {/* Search */}
       <Card className="filters-card">
         <div className="search-box">
           <Search size={20} />
@@ -123,45 +145,48 @@ const ProfileManager = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="bulk-actions">
-          {filteredProfiles.length > 0 && (
-            <>
-              <Button
-                variant="outline"
-                size="small"
-                onClick={toggleSelectAll}
-              >
-                {selectedProfiles.length === filteredProfiles.length ? 'Deselect All' : 'Select All'}
-              </Button>
-              {selectedProfiles.length > 0 && (
+        {isAdmin && (
+          <div className="bulk-actions">
+            {filteredProfiles.length > 0 && (
+              <>
                 <Button
-                  variant="danger"
+                  variant="outline"
                   size="small"
-                  icon={Trash2}
-                  onClick={handleDeleteSelected}
+                  onClick={toggleSelectAll}
                 >
-                  Delete Selected ({selectedProfiles.length})
+                  {selectedProfiles.length === filteredProfiles.length ? 'Deselect All' : 'Select All'}
                 </Button>
-              )}
-            </>
-          )}
-        </div>
+                {selectedProfiles.length > 0 && (
+                  <Button
+                    variant="danger"
+                    size="small"
+                    icon={Trash2}
+                    onClick={handleDeleteSelected}
+                  >
+                    Delete Selected ({selectedProfiles.length})
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </Card>
 
-      {/* Profiles Grid */}
       <div className="profiles-grid">
         {filteredProfiles.map(profile => (
-          <Card 
-            key={profile.profileId} 
+          <Card
+            key={profile.profileId}
             className={`profile-card ${selectedProfiles.includes(profile.profileId) ? 'selected' : ''}`}
           >
             <div className="profile-card-header">
-              <input
-                type="checkbox"
-                checked={selectedProfiles.includes(profile.profileId)}
-                onChange={() => toggleSelectProfile(profile.profileId)}
-                className="profile-checkbox"
-              />
+              {isAdmin && (
+                <input
+                  type="checkbox"
+                  checked={selectedProfiles.includes(profile.profileId)}
+                  onChange={() => toggleSelectProfile(profile.profileId)}
+                  className="profile-checkbox"
+                />
+              )}
               <div className="profile-icon">
                 <Package size={24} />
               </div>
@@ -204,14 +229,16 @@ const ProfileManager = () => {
               >
                 Duplicate
               </Button>
-              <Button
-                variant="danger"
-                size="small"
-                icon={Trash2}
-                onClick={() => handleDeleteProfile(profile.profileId)}
-              >
-                Delete
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="danger"
+                  size="small"
+                  icon={Trash2}
+                  onClick={() => handleDeleteProfile(profile.profileId)}
+                >
+                  Delete
+                </Button>
+              )}
             </div>
           </Card>
         ))}

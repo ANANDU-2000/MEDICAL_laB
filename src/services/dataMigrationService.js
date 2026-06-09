@@ -4,6 +4,7 @@
  */
 
 import apiService from './apiService';
+import { mergeProfilesById, mergeTestsMasterById, safeMergeArray } from '../utils/syncMergeUtils';
 
 export class DataMigrationService {
   constructor() {
@@ -68,7 +69,9 @@ export class DataMigrationService {
         localData.visits.length > 0 ||
         localData.results.length > 0 ||
         localData.invoices.length > 0 ||
-        localData.financialExpenses.length > 0;
+        localData.financialExpenses.length > 0 ||
+        localData.profiles.length > 0 ||
+        localData.testsMaster.length > 0;
 
       if (!hasData) {
         console.log('ℹ️ No local data to migrate');
@@ -105,8 +108,7 @@ export class DataMigrationService {
       if (response.success && response.data) {
         const data = response.data;
 
-        // Update localStorage with backend data directly
-        // FIXED: Allow empty arrays to sync (handles deletions)
+        // Update localStorage with backend data (profiles/tests use safe merge)
         if (Array.isArray(data.patients)) {
           localStorage.setItem('healit_patients', JSON.stringify(data.patients));
         }
@@ -128,11 +130,31 @@ export class DataMigrationService {
         }
 
         if (Array.isArray(data.profiles)) {
-          localStorage.setItem('healit_profiles', JSON.stringify(data.profiles));
+          const localProfiles = JSON.parse(localStorage.getItem('healit_profiles') || '[]');
+          const { merged, skippedEmptyServer } = safeMergeArray(
+            localProfiles,
+            data.profiles,
+            mergeProfilesById
+          );
+          if (skippedEmptyServer) {
+            console.warn('Skipping profile overwrite: server empty, local has data');
+          } else {
+            localStorage.setItem('healit_profiles', JSON.stringify(merged));
+          }
         }
 
         if (Array.isArray(data.testsMaster)) {
-          localStorage.setItem('healit_tests_master', JSON.stringify(data.testsMaster));
+          const localTests = JSON.parse(localStorage.getItem('healit_tests_master') || '[]');
+          const { merged, skippedEmptyServer } = safeMergeArray(
+            localTests,
+            data.testsMaster,
+            mergeTestsMasterById
+          );
+          if (skippedEmptyServer) {
+            console.warn('Skipping testsMaster overwrite: server empty, local has data');
+          } else {
+            localStorage.setItem('healit_tests_master', JSON.stringify(merged));
+          }
         }
 
         if (Array.isArray(data.auditLogs)) {

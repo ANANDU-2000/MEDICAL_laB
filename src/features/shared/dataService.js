@@ -17,7 +17,7 @@ const API_URL = import.meta.env.VITE_API_URL
     ? '/api'
     : 'http://localhost:8888/.netlify/functions/api');
 
-// Helper for API calls (fire and forget for mutations)
+// Helper for API calls — returns normalized { success, data, error }
 const apiCall = async (endpoint, method, body) => {
   try {
     const res = await fetch(`${API_URL}${endpoint}`, {
@@ -25,14 +25,46 @@ const apiCall = async (endpoint, method, body) => {
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined
     });
-    return await res.json();
+
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const error =
+        payload?.error ||
+        payload?.message ||
+        `Request failed (${res.status})`;
+      return { success: false, error, status: res.status, data: payload?.data };
+    }
+
+    if (payload && typeof payload === 'object') {
+      if (payload.success === false || payload.error) {
+        return {
+          success: false,
+          error: payload.error || payload.message || 'Request failed',
+          data: payload.data
+        };
+      }
+      if (payload.success === true) {
+        return { success: true, data: payload.data ?? payload, error: null };
+      }
+      // Express-style responses without success flag
+      if (payload.error) {
+        return { success: false, error: payload.error, data: null };
+      }
+      return { success: true, data: payload, error: null };
+    }
+
+    return { success: true, data: payload, error: null };
   } catch (error) {
-    // Silent fail - server not required for local operation
-    // Only log in development for debugging
     if (import.meta.env.DEV) {
       console.debug(`[API] ${method} ${endpoint} - Server offline (using localStorage)`);
     }
-    return null;
+    return { success: false, error: error.message || 'Network error', data: null };
   }
 };
 
@@ -207,7 +239,7 @@ export const addTestToMaster = (test) => {
 // Profile Operations
 export const getProfiles = () => {
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
-  return profiles.filter(p => p.active);
+  return profiles.filter((p) => p.active !== false);
 };
 
 export const getProfileById = (profileId) => {
@@ -228,32 +260,39 @@ export const getProfileWithTests = (profileId) => {
   return { ...profile, tests };
 };
 
-export const addProfile = (profileData) => {
+export const addProfile = async (profileData) => {
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
   const newProfile = {
     ...profileData,
     profileId: profileData.profileId || `PROF_${Date.now()}`,
-    active: profileData.active !== false,
+    active: true,
     createdAt: profileData.createdAt || new Date().toISOString()
   };
   profiles.push(newProfile);
   localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
   dispatchDataUpdate('profiles');
 
-  apiCall('/profiles', 'POST', newProfile);
+  const apiResult = await apiCall('/profiles', 'POST', newProfile);
 
-  return newProfile;
+  return {
+    profile: newProfile,
+    synced: apiResult.success === true,
+    error: apiResult.error || null
+  };
 };
 
 export const updateProfile = async (profileId, profileData) => {
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
   const index = profiles.findIndex((p) => p.profileId === profileId);
-  if (index === -1) return { profile: null, synced: false };
+  if (index === -1) {
+    return { profile: null, synced: false, error: 'Profile not found' };
+  }
 
   const updated = {
     ...profiles[index],
     ...profileData,
     profileId,
+    active: true,
     updatedAt: new Date().toISOString()
   };
   profiles[index] = updated;
@@ -261,27 +300,52 @@ export const updateProfile = async (profileId, profileData) => {
   dispatchDataUpdate('profiles');
 
   const apiResult = await apiCall(`/profiles/${profileId}`, 'PUT', updated);
-  const synced = apiResult?.success !== false && apiResult !== null;
 
-  return { profile: updated, synced };
+  return {
+    profile: updated,
+    synced: apiResult.success === true,
+    error: apiResult.error || null
+  };
 };
 
-export const deleteProfile = async (profileId) => {
+const assertAdminCanDelete = (role) => {
+  if (role && role !== 'admin') {
+    return { allowed: false, error: 'Only admin can delete profiles' };
+  }
+  return { allowed: true };
+};
+
+export const deleteProfile = async (profileId, role = 'admin') => {
+  const guard = assertAdminCanDelete(role);
+  if (!guard.allowed) {
+    return { deleted: false, synced: false, error: guard.error };
+  }
+
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
   const updatedProfiles = profiles.filter((p) => p.profileId !== profileId);
-  if (updatedProfiles.length === profiles.length) return { deleted: false, synced: false };
+  if (updatedProfiles.length === profiles.length) {
+    return { deleted: false, synced: false, error: 'Profile not found' };
+  }
 
   localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(updatedProfiles));
   dispatchDataUpdate('profiles');
 
   const apiResult = await apiCall(`/profiles/${profileId}`, 'DELETE');
-  const synced = apiResult?.success !== false && apiResult !== null;
 
-  return { deleted: true, synced };
+  return {
+    deleted: true,
+    synced: apiResult.success === true,
+    error: apiResult.error || null
+  };
 };
 
-export const deleteProfiles = async (profileIds) => {
-  if (!profileIds?.length) return { deletedCount: 0, synced: true };
+export const deleteProfiles = async (profileIds, role = 'admin') => {
+  const guard = assertAdminCanDelete(role);
+  if (!guard.allowed) {
+    return { deletedCount: 0, synced: false, error: guard.error };
+  }
+
+  if (!profileIds?.length) return { deletedCount: 0, synced: true, error: null };
 
   const profiles = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILES) || '[]');
   const idSet = new Set(profileIds);
@@ -292,25 +356,39 @@ export const deleteProfiles = async (profileIds) => {
   dispatchDataUpdate('profiles');
 
   const results = await Promise.all(profileIds.map((id) => apiCall(`/profiles/${id}`, 'DELETE')));
-  const synced = results.every((r) => r?.success !== false && r !== null);
+  const synced = results.every((r) => r.success === true);
 
-  return { deletedCount, synced };
+  return { deletedCount, synced, error: synced ? null : 'Some deletes failed to sync' };
 };
 
-export const duplicateProfile = (profileId) => {
+export const duplicateProfile = async (profileId) => {
   const source = getProfileById(profileId);
   if (!source) return null;
 
-  const newProfileId = `PROF_${Date.now()}`;
-  const clonedTests = (source.tests || []).map((test, idx) => ({
+  let clonedTests = (source.tests || []).map((test, idx) => ({
     ...test,
     testId: `TEST_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`
   }));
 
+  if (clonedTests.length === 0 && Array.isArray(source.testIds) && source.testIds.length > 0) {
+    const testsMaster = JSON.parse(localStorage.getItem(STORAGE_KEYS.TESTS_MASTER) || '[]');
+    clonedTests = source.testIds
+      .map((testId, idx) => {
+        const test = testsMaster.find((t) => t.testId === testId);
+        if (!test) return null;
+        return {
+          ...test,
+          testId: `TEST_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`
+        };
+      })
+      .filter(Boolean);
+  }
+
   const duplicate = {
     ...source,
-    profileId: newProfileId,
+    profileId: `PROF_${Date.now()}`,
     name: `${source.name} (Copy)`,
+    active: true,
     testIds: clonedTests.map((t) => t.testId),
     tests: clonedTests,
     createdAt: new Date().toISOString(),
@@ -319,7 +397,8 @@ export const duplicateProfile = (profileId) => {
     updatedByName: undefined
   };
 
-  return addProfile(duplicate);
+  const result = await addProfile(duplicate);
+  return result.profile;
 };
 
 // Patient Operations

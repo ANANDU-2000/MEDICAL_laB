@@ -303,6 +303,9 @@ router.put('/settings', async (req, res) => {
 // ===== PROFILES & TESTS =====
 router.post('/profiles', async (req, res) => {
   try {
+    if (!req.dbConnected) {
+      return res.status(503).json({ success: false, error: 'Database not connected', code: 'DB_OFFLINE' });
+    }
     const profile = new Profile(req.body);
     await profile.save();
     res.json({ success: true, data: profile });
